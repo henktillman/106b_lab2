@@ -47,10 +47,3 @@ IF(NOT CMAKE_INSTALL_COMPONENT OR "${CMAKE_INSTALL_COMPONENT}" STREQUAL "Unspeci
   FILE(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/lab2_pkg" TYPE FILE FILES "/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/package.xml")
 ENDIF(NOT CMAKE_INSTALL_COMPONENT OR "${CMAKE_INSTALL_COMPONENT}" STREQUAL "Unspecified")
 
-IF(NOT CMAKE_INSTALL_COMPONENT OR "${CMAKE_INSTALL_COMPONENT}" STREQUAL "Unspecified")
-  FILE(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/lab2_pkg" TYPE PROGRAM FILES
-    "/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/nodes/object_pose_publisher"
-    "/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/src/starter.py"
-    )
-ENDIF(NOT CMAKE_INSTALL_COMPONENT OR "${CMAKE_INSTALL_COMPONENT}" STREQUAL "Unspecified")
-

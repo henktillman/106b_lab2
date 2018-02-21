@@ -1,4 +1,4 @@
-#!/usr/bin/env python -W ignore::DeprecationWarning
+#!/usr/bin/env python
 """
 Starter script for EE106B grasp planning lab
 Author: Chris Correa
@@ -27,16 +27,16 @@ from utils import vec, adj
 import scipy
 import copy
 import sys
-import cvxpy as cvx
+# import cvxpy as cvx
 import Queue
 from grasp_metrics import compute_force_closure, compute_gravity_resistance, compute_custom_metric
 
 """
 Starter Commands
 rosrun baxter_tools enable_robot.py -e
-rosrun baxter tools camera control.py -o left hand camera -r 1280x800
-rosrun baxter tools camera control.py -o right hand camera -r 1280x800
-roslaunch lab2 pkg baxter left hand track.launch
+rosrun baxter_tools camera_control.py -o left_hand_camera -r 1280x800
+rosrun baxter_tools camera_control.py -o right_hand_camera -r 1280x800
+roslaunch lab2_pkg baxter_left_hand_track.launch
 rosrun baxter_interface joint_trajectory_action_server.py
 roslaunch baxter_moveit_config demo_baxter.launch right_electric_gripper:=true left_electric_gripper:=true
     Only if you need MoveIt
@@ -117,7 +117,7 @@ def contacts_to_baxter_hand_pose(contact1, contact2, approach_direction):
     :obj:`autolab_core:RigidTransform` Hand pose in the object frame
     """
     # YOUR CODE HERE
-    T_obj_gripper = ????
+    T_obj_gripper = None
     return T_obj_gripper
 
 def sorted_contacts(vertices, normals, T_ar_object):
@@ -150,14 +150,14 @@ def sorted_contacts(vertices, normals, T_ar_object):
     all_metrics = list()
     metric = compute_custom_metric
     grasp_indices = list()
-    for i in range(?????):
-        candidate_indices = np.random.choice(possible_indices, 2, replace=False)
-        grasp_indices.append(candidate_indices)
-        contacts = vertices[candidate_indices]
-        contact_normals = normals[candidate_indices]
+    # for i in range(?????):
+    #     candidate_indices = np.random.choice(possible_indices, 2, replace=False)
+    #     grasp_indices.append(candidate_indices)
+    #     contacts = vertices[candidate_indices]
+    #     contact_normals = normals[candidate_indices]
 
-        # YOUR CODE HERE
-        all_metrics.append(????)
+    #     # YOUR CODE HERE
+    #     all_metrics.append(????)
 
     # YOUR CODE HERE.  sort metrics and return the sorted order
 
@@ -183,7 +183,7 @@ OBJECT = "pawn"
 # objects are different this year so you'll have to change this
 # also you can use nodes/object_pose_publisher.py instead of finding the ar tag and then computing T_ar_object in this script.
 if OBJECT == "pawn":
-    MESH_FILENAME = 'objects/pawn.obj'
+    MESH_FILENAME = '/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/objects/pawn.obj'
     # ar tag on the paper
     TAG = 8
     # transform between the object and the AR tag on the paper
@@ -191,12 +191,12 @@ if OBJECT == "pawn":
     # how many times to subdivide the mesh
     SUBDIVIDE_STEPS = 0
 elif OBJECT == 'nozzle':
-    MESH_FILENAME = 'objects/nozzle.obj'
+    MESH_FILENAME = '/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/objects/nozzle.obj'
     TAG = 9
     T_ar_object = tfs.translation_matrix([-.09, -.065, 0.035])
     SUBDIVIDE_STEPS = 1
 elif OBJECT == "gearbox":
-    MESH_FILENAME = 'objects/gearbox.obj'
+    MESH_FILENAME = '/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/objects/gearbox.obj'
     TAG = 10
     T_ar_object = tfs.translation_matrix([-.09, -.065, 0.038])
     SUBDIVIDE_STEPS = 0
@@ -235,6 +235,7 @@ if __name__ == '__main__':
     vertices = mesh.vertices
     triangles = mesh.triangles
     normals = mesh.normals
+    pdb.set_trace()
 
     # ??? = sorted_contacts(???)
 
