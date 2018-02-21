@@ -140,27 +140,29 @@ def sorted_contacts(vertices, normals, T_ar_object):
     :obj:`list` of int
         best_metric_indices is the indices of grasp_indices in order of grasp quality
     """
-    
+    N = 1024
     # prune vertices that are too close to the table so you dont smack into the table
     # you may want to change this line, to be how you see fit
     possible_indices = np.r_[:len(vertices)][vertices[:,2] + T_ar_object[2,3] >= 0.03]
 
     # Finding grasp via vertex sampling.  make sure to not consider grasps where the 
     # vertices are too big for the gripper
-    all_metrics = list()
-    metric = compute_custom_metric
+    # all_metrics = list()
+    metric = compute_custom_metric # this is a function
     grasp_indices = list()
-    # for i in range(?????):
-    #     candidate_indices = np.random.choice(possible_indices, 2, replace=False)
-    #     grasp_indices.append(candidate_indices)
-    #     contacts = vertices[candidate_indices]
-    #     contact_normals = normals[candidate_indices]
+    metric_scores = list()
+    for i in range(N):
+        candidate_indices = np.random.choice(possible_indices, 2, replace=False)
+        grasp_indices.append(candidate_indices)
+        contacts = vertices[candidate_indices]
+        contact_normals = normals[candidate_indices]
+        metric_scores.append(metric(contacts, contact_normals, NUM_FACETS, CONTACT_MU, CONTACT_GAMMA, OBJECT_MASS))
 
-    #     # YOUR CODE HERE
-    #     all_metrics.append(????)
+        # YOUR CODE HERE
+        # all_metrics.append(????)
 
-    # YOUR CODE HERE.  sort metrics and return the sorted order
-
+    # sort metrics and return the sorted order
+    best_metric_indices = sorted(list(range(N)), key=lambda i: metric_scores[i], reverse=True)
     return grasp_indices, best_metric_indices
 
 
@@ -232,9 +234,16 @@ if __name__ == '__main__':
     for i in range(SUBDIVIDE_STEPS):
         mesh = mesh.subdivide(min_tri_length=.02)
 
-    vertices = mesh.vertices
-    triangles = mesh.triangles
-    normals = mesh.normals
+    vertices = mesh.vertices # points on the obj
+    triangles = mesh.triangles # combinations of vertex indices
+    normals = mesh.normals # unit vectors normal to the object surface at their respective vertex
+
+    ar_tag = lookup_tag(TAG)
+
+    # find the transformation from the object coordinates to world coordinates... somehow
+
+    # sample N points
+
     pdb.set_trace()
 
     # ??? = sorted_contacts(???)
