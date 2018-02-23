@@ -25,8 +25,22 @@ def compute_force_closure(contacts, normals, num_facets, mu, gamma, object_mass)
     -------
     float : quality of the grasp
     """
-    # YOUR CODE HERE
-    pass
+    # calculate slope vector between points
+    slope = utils.normalize(contacts[0] - contacts[1])
+
+    score = 0
+
+    # for each point
+    for i in range(len(contacts)):
+        # find angle of line with surface of object at the particular contact point
+        # <x, y> = ||x||||y|| cos(th)
+        line_angle = min(np.arccos(np.dot(normals[i], slope)), np.arccos(np.dot(normals[i], -slope)))
+
+        # find the angle of the friction cone at the same point
+        cone_angle = np.arctan(mu)
+
+        # if the line angle is greater than the cone angle, then not force closure
+        score += (cone_angle - line_angle) * 100
 
 # defined in the book on page 219
 def get_grasp_map(contacts, normals, num_facets, mu, gamma):
@@ -53,7 +67,7 @@ def get_grasp_map(contacts, normals, num_facets, mu, gamma):
     pass
 
 def contact_forces_exist(contacts, normals, num_facets, mu, gamma, desired_wrench):
-    """ Compute whether the given grasp (at contacts with surface normals) can produce the desired_wrench.
+    """ Compute whether the given grasp (at contacts with surface normals) can produce the desired wrench.
         will be used for gravity resistance. 
 
     Parameters

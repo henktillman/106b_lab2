@@ -147,19 +147,22 @@ def sorted_contacts(vertices, normals, T_ar_object):
 
     # Finding grasp via vertex sampling.  make sure to not consider grasps where the 
     # vertices are too big for the gripper
-    # all_metrics = list()
-    metric = compute_custom_metric # this is a function
+
+    # possible metrics: compute_force_closure, compute_gravity_resistance, compute_custom_metric
+    metric = compute_custom_metric 
     grasp_indices = list()
     metric_scores = list()
     for i in range(N):
         candidate_indices = np.random.choice(possible_indices, 2, replace=False)
+        point_dist = utils.length(vertices[candidate_indices[0]] - vertices[candidate_indices[1]])
         grasp_indices.append(candidate_indices)
-        contacts = vertices[candidate_indices]
-        contact_normals = normals[candidate_indices]
-        metric_scores.append(metric(contacts, contact_normals, NUM_FACETS, CONTACT_MU, CONTACT_GAMMA, OBJECT_MASS))
-
-        # YOUR CODE HERE
-        # all_metrics.append(????)
+        # assign lowest possible scores to impossible grasps
+        if point_dist < MIN_HAND_DISTANCE or point_dist > MAX_HAND_DISTANCE:
+            metric_scores.append(-sys.maxint - 1)
+        else:
+            contacts = vertices[candidate_indices]
+            contact_normals = normals[candidate_indices]
+            metric_scores.append(metric(contacts, contact_normals, NUM_FACETS, CONTACT_MU, CONTACT_GAMMA, OBJECT_MASS))
 
     # sort metrics and return the sorted order
     best_metric_indices = sorted(list(range(N)), key=lambda i: metric_scores[i], reverse=True)
