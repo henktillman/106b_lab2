@@ -23,6 +23,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from visualization import Visualizer3D as vis
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from baxter_interface import gripper as baxter_gripper
+import utils
 from utils import vec, adj
 import scipy
 import copy
@@ -43,10 +44,37 @@ roslaunch baxter_moveit_config demo_baxter.launch right_electric_gripper:=true l
 rosrun lab2_pkg main.py
 """
 
+# def lookup_tag(tag_number):
+#     listener = tf.TransformListener()
+#     from_frame = 'base'
+#     to_frame = 'ar_marker_{}'.format(tag_number)
+#     while not rospy.is_shutdown():
+#         try:
+#             # if not listener.frameExists(from_frame) or not listener.frameExists(to_frame):
+#             #     print 'Frames not found'
+#             #     print 'Did you place AR marker {} within view of the baxter left hand camera?'.format(tag_number)
+#             #     exit(0)
+#             t = listener.getLatestCommonTime(from_frame, to_frame)
+#             tag_pos, _ = listener.lookupTransform(from_frame, to_frame, t)
+#             break
+#         except:
+#             continue
+#     return tag_pos[0:3] # only return x, y, z
 def lookup_tag(tag_number):
+    """ Returns the AR tag position in world coordinates 
+
+    Parameters
+    ----------
+    tag_number : int
+        AR tag number
+
+    Returns
+    -------
+    :obj:`autolab_core.RigidTransform` AR tag position in world coordinates
+    """
     listener = tf.TransformListener()
-    from_frame = 'base'
     to_frame = 'ar_marker_{}'.format(tag_number)
+    from_frame = 'base'
     while not rospy.is_shutdown():
         try:
             # if not listener.frameExists(from_frame) or not listener.frameExists(to_frame):
@@ -54,11 +82,12 @@ def lookup_tag(tag_number):
             #     print 'Did you place AR marker {} within view of the baxter left hand camera?'.format(tag_number)
             #     exit(0)
             t = listener.getLatestCommonTime(from_frame, to_frame)
-            tag_pos, _ = listener.lookupTransform(from_frame, to_frame, t)
+            tag_pos, tag_rot = listener.lookupTransform(from_frame, to_frame, t)
             break
         except:
             continue
-    return tag_pos[0:3] # only return x, y, z
+    tag_rot = np.array(tfs.quaternion_matrix(tag_rot)[0:3, 0:3])
+    return RigidTransform(tag_rot, tag_pos)
 
 def close_gripper():
     """closes the gripper"""
@@ -140,7 +169,7 @@ def sorted_contacts(vertices, normals, T_ar_object):
     :obj:`list` of int
         best_metric_indices is the indices of grasp_indices in order of grasp quality
     """
-    N = 1024
+    N = 10000
     # prune vertices that are too close to the table so you dont smack into the table
     # you may want to change this line, to be how you see fit
     possible_indices = np.r_[:len(vertices)][vertices[:,2] + T_ar_object[2,3] >= 0.03]
@@ -149,7 +178,7 @@ def sorted_contacts(vertices, normals, T_ar_object):
     # vertices are too big for the gripper
 
     # possible metrics: compute_force_closure, compute_gravity_resistance, compute_custom_metric
-    metric = compute_custom_metric 
+    metric = compute_force_closure 
     grasp_indices = list()
     metric_scores = list()
     for i in range(N):
@@ -162,9 +191,11 @@ def sorted_contacts(vertices, normals, T_ar_object):
         else:
             contacts = vertices[candidate_indices]
             contact_normals = normals[candidate_indices]
-            metric_scores.append(metric(contacts, contact_normals, NUM_FACETS, CONTACT_MU, CONTACT_GAMMA, OBJECT_MASS))
+            score = metric(contacts, contact_normals, CONTACT_MU, CONTACT_GAMMA, OBJECT_MASS)
+            metric_scores.append(score)
 
     # sort metrics and return the sorted order
+    pdb.set_trace()
     best_metric_indices = sorted(list(range(N)), key=lambda i: metric_scores[i], reverse=True)
     return grasp_indices, best_metric_indices
 
@@ -180,7 +211,7 @@ OBJECT_MASS = 0.25 # kg
 # approximate the friction cone as the linear combination of `NUM_FACETS` vectors
 NUM_FACETS = 32
 # set this to false while debugging your grasp analysis
-BAXTER_CONNECTED = False
+BAXTER_CONNECTED = True
 # how many to execute
 NUM_GRASPS = 5
 OBJECT = "pawn"
@@ -190,9 +221,10 @@ OBJECT = "pawn"
 if OBJECT == "pawn":
     MESH_FILENAME = '/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/objects/pawn.obj'
     # ar tag on the paper
-    TAG = 8
+    TAG = 14
     # transform between the object and the AR tag on the paper
-    T_ar_object = tfs.translation_matrix([-.09, -.065, 0.106])
+    # z direction sketch af but Adarsh gave us these offsets
+    T_ar_object = tfs.translation_matrix([-.05, -.055, 0.00])
     # how many times to subdivide the mesh
     SUBDIVIDE_STEPS = 0
 elif OBJECT == 'nozzle':
@@ -205,15 +237,7 @@ elif OBJECT == "gearbox":
     TAG = 10
     T_ar_object = tfs.translation_matrix([-.09, -.065, 0.038])
     SUBDIVIDE_STEPS = 0
-
-# Change to left if necessary!
-if BAXTER_CONNECTED:
-    right_gripper = baxter_gripper.Gripper('right')
-
-listener = tf.TransformListener()
-from_frame = 'base'
-time.sleep(1)
-
+    
 if __name__ == '__main__':
     if BAXTER_CONNECTED:
         moveit_commander.roscpp_initialize(sys.argv)
@@ -223,6 +247,11 @@ if __name__ == '__main__':
         right_arm = moveit_commander.MoveGroupCommander('right_arm')
         right_arm.set_planner_id('RRTConnectkConfigDefault')
         right_arm.set_planning_time(5)
+        right_gripper = baxter_gripper.Gripper('right')
+
+        listener = tf.TransformListener()
+        from_frame = 'base'
+        time.sleep(1)
         
     # Main Code
     br = tf.TransformBroadcaster()
@@ -240,33 +269,27 @@ if __name__ == '__main__':
     vertices = mesh.vertices # points on the obj
     triangles = mesh.triangles # combinations of vertex indices
     normals = mesh.normals # unit vectors normal to the object surface at their respective vertex
-
     ar_tag = lookup_tag(TAG)
-
+    print("found", TAG)
     # find the transformation from the object coordinates to world coordinates... somehow
 
-    # sample N points
+    grasp_indices, best_metric_indices = sorted_contacts(vertices, normals, T_ar_object)
 
-    pdb.set_trace()
-
-    # ??? = sorted_contacts(???)
-
-    # # YOUR CODE HERE
-    # for current_metric in ?????:
-    #     # YOUR CODE HERE
-        
-    #     # visualize the mesh and contacts
-    #     vis.figure()
-    #     vis.mesh(mesh)
-    #     vis.normals(NormalCloud(np.hstack((normal1.reshape(-1, 1), normal2.reshape(-1, 1))), frame='test'),
-    #         PointCloud(np.hstack((contact1.reshape(-1, 1), contact2.reshape(-1, 1))), frame='test'))
-    #     # vis.pose(T_obj_gripper, alpha=0.05)
-    #     vis.show()
-    #     if BAXTER_CONNECTED:
-    #         repeat = True
-    #         while repeat:
-    #             execute_grasp(T_obj_gripper)
-    #             repeat = bool(raw_input("repeat?"))
+    for indices in best_metrice_indices:
+        normal1, normal2 = normals[indices[0]], normals[indices[1]]
+        contact1, contact2 = contacts[indices[0]], contacts[indices[1]]
+        # visualize the mesh and contacts
+        vis.figure()
+        vis.mesh(mesh)
+        vis.normals(NormalCloud(np.hstack((normal1.reshape(-1, 1), normal2.reshape(-1, 1))), frame='test'),
+            PointCloud(np.hstack((contact1.reshape(-1, 1), contact2.reshape(-1, 1))), frame='test'))
+        # vis.pose(T_obj_gripper, alpha=0.05)
+        vis.show()
+        if BAXTER_CONNECTED:
+            repeat = True
+            while repeat:
+                execute_grasp(T_obj_gripper)
+                repeat = bool(raw_input("repeat?"))
 
     # 500, 1200
     exit()

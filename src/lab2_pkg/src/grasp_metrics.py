@@ -1,8 +1,10 @@
 # may need more imports
 import numpy as np
 from utils import vec, adj
+import utils
+import sys
 
-def compute_force_closure(contacts, normals, mu):
+def compute_force_closure(contacts, normals, mu, gamma, object_mass):
     """ Compute the force closure of some object at contacts, with normal vectors stored in normals
         You can use the line method described in HW2.  if you do you will not need num_facets
 
@@ -40,7 +42,11 @@ def compute_force_closure(contacts, normals, mu):
         cone_angle = np.arctan(mu)
 
         # if the line angle is greater than the cone angle, then not force closure
-        score += (cone_angle - line_angle) * 100
+        if cone_angle - line_angle < 0:
+            score += -sys.maxint/10
+        else:
+            score += (cone_angle - line_angle) * 100
+    return score
 
 # defined in the book on page 219
 def get_grasp_map(contacts, normals, mu, gamma):
@@ -124,7 +130,7 @@ def contact_forces_exist(contacts, normals, mu, gamma, desired_wrench):
     return False
 
 
-def compute_gravity_resistance(contacts, normals, num_facets, mu, gamma, object_mass):
+def compute_gravity_resistance(contacts, normals, mu, gamma, object_mass):
     """ Gravity produces some wrench on your object.  Computes whether the grasp can produce and equal and opposite wrench
 
     Parameters
@@ -150,7 +156,7 @@ def compute_gravity_resistance(contacts, normals, num_facets, mu, gamma, object_
     gravity_wrench = np.array([0, 0, -9.81 * object_mass, 0, 0, 0])
     return contact_forces_exist(contacts, normals, mu, gamma, gravity_wrench)
 
-def compute_custom_metric(contacts, normals, num_facets, mu, gamma, object_mass):
+def compute_custom_metric(contacts, normals, mu, gamma, object_mass):
     """ I suggest Ferrari Canny, but feel free to do anything other metric you find. 
 
     Parameters
