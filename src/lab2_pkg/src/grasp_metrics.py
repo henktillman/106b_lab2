@@ -63,8 +63,29 @@ def get_grasp_map(contacts, normals, num_facets, mu, gamma):
     -------
     :obj:`numpy.ndarray` grasp map
     """
-    # YOUR CODE HERE
-    pass
+    B = np.matrix([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 1]])
+    grasp_map = None
+    for i in range(len(contacts)):
+        translation = contacts[i]
+
+        orig_axis = np.array([0, 0, 1])
+        final_axis = normals[i]
+
+        v = np.cross(orig_axis, final_axis)
+        ssc = np.matrix([[0, -v[2], v[1]],[v[2], 0, -v[0]], [-v[1], v[0], 0]])
+        rotation = np.eye(3) + ssc + np.dot(ssc, ssc)*(1 - np.dot(A, B)) / np.linalg.norm(v)**2
+
+        g = np.vstack((rotation, np.array([0, 0, 0])))
+        c = np.vstack((np.matrix(translation).T, np.array([1])))
+        g = np.hstack((g, c))
+        adj = utils.adj(np.linalg.inv(g))
+
+        if not grasp_map:
+            grasp_map = np.dot(adj, B)
+        else:
+            grasp_map = np.hstack((grasp_map, np.dot(adj, B)))
+    return grasp_map
+
 
 def contact_forces_exist(contacts, normals, num_facets, mu, gamma, desired_wrench):
     """ Compute whether the given grasp (at contacts with surface normals) can produce the desired wrench.
