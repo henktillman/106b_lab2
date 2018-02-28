@@ -182,4 +182,7 @@ def compute_custom_metric(contacts, normals, mu, gamma, object_mass):
     float : quality of the grasp
     """
     grasp_map = get_grasp_map(contacts, normals, mu, gamma)
-    return np.linalg.det(np.dot(grasp_map, grasp_map.T))
+    try:
+        return np.linalg.det(np.dot(grasp_map, grasp_map.T))
+    except:
+        return 0

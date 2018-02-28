@@ -45,22 +45,7 @@ roslaunch baxter_moveit_config demo_baxter.launch right_electric_gripper:=true l
 rosrun lab2_pkg main.py
 """
 
-# def lookup_tag(tag_number):
-#     listener = tf.TransformListener()
-#     from_frame = 'base'
-#     to_frame = 'ar_marker_{}'.format(tag_number)
-#     while not rospy.is_shutdown():
-#         try:
-#             # if not listener.frameExists(from_frame) or not listener.frameExists(to_frame):
-#             #     print 'Frames not found'
-#             #     print 'Did you place AR marker {} within view of the baxter left hand camera?'.format(tag_number)
-#             #     exit(0)
-#             t = listener.getLatestCommonTime(from_frame, to_frame)
-#             tag_pos, _ = listener.lookupTransform(from_frame, to_frame, t)
-#             break
-#         except:
-#             continue
-#     return tag_pos[0:3] # only return x, y, z
+
 def lookup_tag(tag_number):
     """ Returns the AR tag position in world coordinates 
 
@@ -180,7 +165,7 @@ def sorted_contacts(vertices, normals, T_ar_object):
     # vertices are too big for the gripper
 
     # possible metrics: compute_force_closure, compute_gravity_resistance, compute_custom_metric
-    metric = compute_gravity_resistance 
+    metric = compute_custom_metric
     grasp_indices = list()
     metric_scores = list()
     for i in range(N):
