@@ -16,7 +16,7 @@ def compute_force_closure(contacts, normals, mu, gamma, object_mass):
         obj mesh normals at the contact points
     num_facets : int
         number of vectors to use to approximate the friction cone.  these vectors will be along the friction cone boundary
-    mu : float 
+    mu : float
         coefficient of friction
     gamma : float
         torsional friction coefficient
@@ -60,7 +60,7 @@ def get_grasp_map(contacts, normals, mu, gamma):
         obj mesh normals at the contact points
     num_facets : int
         number of vectors to use to approximate the friction cone.  these vectors will be along the friction cone boundary
-    mu : float 
+    mu : float
         coefficient of friction
     gamma : float
         torsional friction coefficient
@@ -91,11 +91,10 @@ def get_grasp_map(contacts, normals, mu, gamma):
         else:
             grasp_map = np.hstack((grasp_map, np.dot(adj, B)))
     return grasp_map
-2
 
 def contact_forces_exist(contacts, normals, mu, gamma, desired_wrench):
     """ Compute whether the given grasp (at contacts with surface normals) can produce the desired wrench.
-        will be used for gravity resistance. 
+        will be used for gravity resistance.
 
     Parameters
     ----------
@@ -105,7 +104,7 @@ def contact_forces_exist(contacts, normals, mu, gamma, desired_wrench):
         obj mesh normals at the contact points
     num_facets : int
         number of vectors to use to approximate the friction cone.  these vectors will be along the friction cone boundary
-    mu : float 
+    mu : float
         coefficient of friction
     gamma : float
         torsional friction coefficient
@@ -117,7 +116,7 @@ def contact_forces_exist(contacts, normals, mu, gamma, desired_wrench):
     bool : whether contact forces can produce the desired_wrench on the object
     """
     def in_friction_cone(f):
-        
+
         frictional = (f[0]**2 + f[1]**2)**0.5 <= mu * f[2]
         torsional = abs(f[3]) <= gamma * f[2]
         return frictional and torsional
@@ -145,7 +144,7 @@ def compute_gravity_resistance(contacts, normals, mu, gamma, object_mass):
         obj mesh normals at the contact points
     num_facets : int
         number of vectors to use to approximate the friction cone.  these vectors will be along the friction cone boundary
-    mu : float 
+    mu : float
         coefficient of friction
     gamma : float
         torsional friction coefficient
@@ -161,7 +160,7 @@ def compute_gravity_resistance(contacts, normals, mu, gamma, object_mass):
     return contact_forces_exist(contacts, normals, mu, gamma, gravity_wrench)
 
 def compute_custom_metric(contacts, normals, mu, gamma, object_mass):
-    """ I suggest Ferrari Canny, but feel free to do anything other metric you find. 
+    """ I suggest Ferrari Canny, but feel free to do anything other metric you find.
 
     Parameters
     ----------
@@ -171,7 +170,7 @@ def compute_custom_metric(contacts, normals, mu, gamma, object_mass):
         obj mesh normals at the contact points
     num_facets : int
         number of vectors to use to approximate the friction cone.  these vectors will be along the friction cone boundary
-    mu : float 
+    mu : float
         coefficient of friction
     gamma : float
         torsional friction coefficient
@@ -182,5 +181,5 @@ def compute_custom_metric(contacts, normals, mu, gamma, object_mass):
     -------
     float : quality of the grasp
     """
-    # YOUR CODE HERE :)
-    pass
+    grasp_map = get_grasp_map(contacts, normals, mu, gamma)
+    return np.linalg.det(np.dot(grasp_map, grasp_map.T))
