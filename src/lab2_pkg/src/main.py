@@ -21,6 +21,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 from meshpy import ObjFile
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from visualization import Visualizer3D as vis
+from matplotlib import mlab
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from baxter_interface import gripper as baxter_gripper
 import utils
@@ -173,12 +174,13 @@ def sorted_contacts(vertices, normals, T_ar_object):
     # prune vertices that are too close to the table so you dont smack into the table
     # you may want to change this line, to be how you see fit
     possible_indices = np.r_[:len(vertices)][vertices[:,2] + T_ar_object[2,3] >= 0.03]
+    np.random.shuffle(possible_indices)
 
     # Finding grasp via vertex sampling.  make sure to not consider grasps where the 
     # vertices are too big for the gripper
 
     # possible metrics: compute_force_closure, compute_gravity_resistance, compute_custom_metric
-    metric = compute_force_closure 
+    metric = compute_gravity_resistance 
     grasp_indices = list()
     metric_scores = list()
     for i in range(N):
@@ -195,13 +197,12 @@ def sorted_contacts(vertices, normals, T_ar_object):
             metric_scores.append(score)
 
     # sort metrics and return the sorted order
-    pdb.set_trace()
     best_metric_indices = sorted(list(range(N)), key=lambda i: metric_scores[i], reverse=True)
     return grasp_indices, best_metric_indices
 
 
 # probably don't need to change these (but confirm that they're correct)
-MAX_HAND_DISTANCE = .04
+MAX_HAND_DISTANCE = .055
 MIN_HAND_DISTANCE = .01
 CONTACT_MU = 0.5 # coefficient of friction
 CONTACT_GAMMA = 0.1 # coefficient of tortion friction
@@ -248,6 +249,8 @@ if __name__ == '__main__':
         right_arm.set_planner_id('RRTConnectkConfigDefault')
         right_arm.set_planning_time(5)
         right_gripper = baxter_gripper.Gripper('right')
+        # right_gripper.calibrate()
+        # right_gripper.open()
 
         listener = tf.TransformListener()
         from_frame = 'base'
@@ -275,9 +278,11 @@ if __name__ == '__main__':
 
     grasp_indices, best_metric_indices = sorted_contacts(vertices, normals, T_ar_object)
 
-    for indices in best_metrice_indices:
-        normal1, normal2 = normals[indices[0]], normals[indices[1]]
-        contact1, contact2 = contacts[indices[0]], contacts[indices[1]]
+    for indices in best_metric_indices[0:5]:
+        a = grasp_indices[indices][0]
+        b = grasp_indices[indices][1]
+        normal1, normal2 = normals[a], normals[b]
+        contact1, contact2 = vertices[a], vertices[b]
         # visualize the mesh and contacts
         vis.figure()
         vis.mesh(mesh)
@@ -285,7 +290,7 @@ if __name__ == '__main__':
             PointCloud(np.hstack((contact1.reshape(-1, 1), contact2.reshape(-1, 1))), frame='test'))
         # vis.pose(T_obj_gripper, alpha=0.05)
         vis.show()
-        if BAXTER_CONNECTED:
+        if False:
             repeat = True
             while repeat:
                 execute_grasp(T_obj_gripper)

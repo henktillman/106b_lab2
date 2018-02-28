@@ -2,7 +2,7 @@
 import numpy as np
 from utils import vec, adj
 import utils
-import sys
+import sys, pdb
 
 def compute_force_closure(contacts, normals, mu, gamma, object_mass):
     """ Compute the force closure of some object at contacts, with normal vectors stored in normals
@@ -45,7 +45,7 @@ def compute_force_closure(contacts, normals, mu, gamma, object_mass):
         if cone_angle - line_angle < 0:
             score += -sys.maxint/10
         else:
-            score += (cone_angle - line_angle) * 100
+            score += (cone_angle - line_angle)
     return score
 
 # defined in the book on page 219
@@ -79,19 +79,19 @@ def get_grasp_map(contacts, normals, mu, gamma):
 
         v = np.cross(orig_axis, final_axis)
         ssc = np.matrix([[0, -v[2], v[1]],[v[2], 0, -v[0]], [-v[1], v[0], 0]])
-        rotation = np.eye(3) + ssc + np.dot(ssc, ssc)*(1 - np.dot(A, B)) / np.linalg.norm(v)**2
+        rotation = np.eye(3) + ssc + np.dot(ssc, ssc)*(1 - np.dot(orig_axis, final_axis)) / np.linalg.norm(v)**2
 
         g = np.vstack((rotation, np.array([0, 0, 0])))
         c = np.vstack((np.matrix(translation).T, np.array([1])))
         g = np.hstack((g, c))
         adj = utils.adj(np.linalg.inv(g))
 
-        if not grasp_map:
+        if grasp_map is None:
             grasp_map = np.dot(adj, B)
         else:
             grasp_map = np.hstack((grasp_map, np.dot(adj, B)))
     return grasp_map
-
+2
 
 def contact_forces_exist(contacts, normals, mu, gamma, desired_wrench):
     """ Compute whether the given grasp (at contacts with surface normals) can produce the desired wrench.
@@ -117,12 +117,16 @@ def contact_forces_exist(contacts, normals, mu, gamma, desired_wrench):
     bool : whether contact forces can produce the desired_wrench on the object
     """
     def in_friction_cone(f):
+        
         frictional = (f[0]**2 + f[1]**2)**0.5 <= mu * f[2]
         torsional = abs(f[3]) <= gamma * f[2]
-        return frictional * torsional
+        return frictional and torsional
 
     grasp_map = get_grasp_map(contacts, normals, mu, gamma)
-    force_vecs = np.dot(np.linalg.pinv(grasp_map), desired_wrench)
+    try:
+        force_vecs = np.asarray(np.dot(np.linalg.pinv(grasp_map), desired_wrench))[0]
+    except:
+        return False
     f1 = force_vecs[0:4]
     f2 = force_vecs[4:]
     if in_friction_cone(f1) and in_friction_cone(f2):
