@@ -114,7 +114,7 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
         return
 
     # find transformation from obj frame to world frame
-    obj_to_world_translation = ar_tag + T_ar_object
+    obj_to_world_translation = ar_tag.translation + T_ar_object[0:3,3]
     g_obj_to_world = np.eye(4)
     g_obj_to_world[0:3, 3] = obj_to_world_translation
 
@@ -131,33 +131,43 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     # first pose
     # multiply z direction unit vector by T_object_gripper rotation, multiply by how far we want
     # to start from the intended grip, and add it to the translation of T_object_gripper to get destination
-    pullback_dist = 0.3
-    first_position = np.matmul(T_object_gripper.rotation, np.array([0, 0, 1])) * 0.3 + T_object_gripper.translation
+    pullback_dist = 0.05
+    first_position = list(np.array([0, 0, 1]) * pullback_dist + T_object_gripper.translation)
+    first_position.append(1)
+    first_position = np.array(first_position)
 
     # multiply destination by overall transform to get destination point
     first_dest = np.matmul(g_final, first_position)
+    # pdb.set_trace()
+    print(first_dest)
 
     # go to that point with orientation
     goal1 = PoseStamped()
     goal1.header.frame_id = "base"
-    goal1.pose.position = first_dest[0:3]
-    goal1.pose.orientation = orient
+    goal1.pose.position.x = first_dest[0]
+    goal1.pose.position.y = first_dest[1]
+    goal1.pose.position.z = first_dest[2]
+    goal1.pose.orientation.x = orient[0]
+    goal1.pose.orientation.y = orient[1]
+    goal1.pose.orientation.z = orient[2]
+    goal1.pose.orientation.w = orient[3]
+
     go_to_pose(goal1.pose)
 
     # second pose
 
     # preserve orientation (assumes vertical/top-down orientation, as before)
-    orien_const = OrientationConstraint()
-    orien_const.link_name = "right_gripper";
-    orien_const.header.frame_id = "base";
-    orien_const.orientation.y = -1.0;
-    orien_const.absolute_x_axis_tolerance = 0.1;
-    orien_const.absolute_y_axis_tolerance = 0.1;
-    orien_const.absolute_z_axis_tolerance = 0.1;
-    orien_const.weight = 1.0;
-    consts = Constraints()
-    consts.orientation_constraints = [orien_const]
-    right_arm.set_path_constraints(consts)
+    # orien_const = OrientationConstraint()
+    # orien_const.link_name = "right_gripper";
+    # orien_const.header.frame_id = "base";
+    # orien_const.orientation.y = -1.0;
+    # orien_const.absolute_x_axis_tolerance = 0.1;
+    # orien_const.absolute_y_axis_tolerance = 0.1;
+    # orien_const.absolute_z_axis_tolerance = 0.1;
+    # orien_const.weight = 1.0;
+    # consts = Constraints()
+    # consts.orientation_constraints = [orien_const]
+    # right_arm.set_path_constraints(consts)
 
     # multiply [0, 0, 0, 1] by overall transform to get destination point
     second_dest = np.matmul(g_final, np.array([0, 0, 0, 1]))
@@ -165,8 +175,13 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     # go to that point with orientation constraint
     goal2 = PoseStamped()
     goal2.header.frame_id = "base"
-    goal2.pose.position = second_dest[0:3]
-    goal2.pose.orientation = orient
+    goal2.pose.position.x = second_dest[0]
+    goal2.pose.position.y = second_dest[1]
+    goal2.pose.position.z = second_dest[2]
+    goal2.pose.orientation.x = orient[0]
+    goal2.pose.orientation.y = orient[1]
+    goal2.pose.orientation.z = orient[2]
+    goal2.pose.orientation.w = orient[3]
     go_to_pose(goal2.pose)
 
     # close gripper
@@ -205,7 +220,7 @@ def contacts_to_baxter_hand_pose(contact1, contact2, approach_direction):
 
     # find g transform from object frame to grasp frame...
     transform = utils.look_at_general(translation, x_axis, z_axis)
-    T_obj_gripper = autolab_core.RigidTransform(transform[0:3,0:3], translation)
+    T_obj_gripper = RigidTransform(transform[0:3,0:3], translation)
     return T_obj_gripper
 
 def sorted_contacts(vertices, normals, T_ar_object):
@@ -264,7 +279,7 @@ MAX_HAND_DISTANCE = 0.1 # .055
 MIN_HAND_DISTANCE = 0.01
 CONTACT_MU = 0.5 # coefficient of friction
 CONTACT_GAMMA = 0.1 # coefficient of torsion friction
-orientation
+
 # will need to change these
 OBJECT_MASS = 0.25 # kg
 # approximate the friction cone as the linear combination of `NUM_FACETS` vectors
@@ -283,7 +298,7 @@ if OBJECT == "pawn":
     TAG = 14
     # transform between the object and the AR tag on the paper
     # z direction sketch af but Adarsh gave us these offsets
-    T_ar_object = tfs.translation_matrix([-.05, -.055, 0.00])
+    T_ar_object = tfs.translation_matrix([-.05, 0.085, 0.091])
     # how many times to subdivide the mesh
     SUBDIVIDE_STEPS = 0
 elif OBJECT == 'nozzle':
@@ -347,7 +362,7 @@ if __name__ == '__main__':
             PointCloud(np.hstack((contact1.reshape(-1, 1), contact2.reshape(-1, 1))), frame='test'))
         # vis.pose(T_obj_gripper, alpha=0.05)
         vis.show()
-        if False:
+        if BAXTER_CONNECTED:
             repeat = True
             while repeat:
                 # come in from the top...
