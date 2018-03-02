@@ -67,6 +67,7 @@ def rigid(twist):
             [0, 0, 1]
         ])
 
+# eye = origin of new frame defined at contact point, center = direction of x axis, up = direction of z axis
 def look_at_general(eye, center, up):
     f = tfs.unit_vector(center - eye)
     u = tfs.unit_vector(up)

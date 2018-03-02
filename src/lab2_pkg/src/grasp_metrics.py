@@ -181,6 +181,7 @@ def compute_custom_metric(contacts, normals, mu, gamma, object_mass):
     -------
     float : quality of the grasp
     """
+    # Hyundai-Canny metric
     grasp_map = get_grasp_map(contacts, normals, mu, gamma)
     try:
         return np.linalg.det(np.dot(grasp_map, grasp_map.T))

@@ -39,6 +39,7 @@ rosrun baxter_tools enable_robot.py -e
 rosrun baxter_tools camera_control.py -o left_hand_camera -r 1280x800
 rosrun baxter_tools camera_control.py -o right_hand_camera -r 1280x800
 roslaunch lab2_pkg baxter_left_hand_track.launch
+roslaunch lab2_pkg baxter_right_hand_track.launch
 rosrun baxter_interface joint_trajectory_action_server.py
 roslaunch baxter_moveit_config demo_baxter.launch right_electric_gripper:=true left_electric_gripper:=true
     Only if you need MoveIt
@@ -97,7 +98,7 @@ def go_to_pose(pose):
     right_arm.plan()
     right_arm.go()
 
-def execute_grasp(T_object_gripper):
+def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     """takes in the desired hand position relative to the object, finds the desired hand position in world coordinates.  
        Then moves the gripper from its starting orientation to some distance behind the object, then move to the 
        hand pose in world coordinates, closes the gripper, then moves up.  
@@ -107,12 +108,73 @@ def execute_grasp(T_object_gripper):
     T_object_gripper : :obj:`autolab_core.RigidTransform`
         desired position of gripper relative to the objects coordinate frame
     """
+    # change the planner used with set_planner_id() in main
     inp = raw_input('Press <Enter> to move, or \'exit\' to exit')
     if inp == "exit":
         return
-    # moveit go_to_pose()
-    # change the planner used with set_planner_id() in main
-    # YOUR CODE HERE
+
+    # find transformation from obj frame to world frame
+    obj_to_world_translation = ar_tag + T_ar_object
+    g_obj_to_world = np.eye(4)
+    g_obj_to_world[0:3, 3] = obj_to_world_translation
+
+    # three poses, all use orientation from T_object_gripper (orientations should be preserved
+    # between world and obj frame)
+    orient = T_object_gripper.quaternion
+
+    # multiply g_obj_to_world by new T_object_gripper to get overall transform
+    g_final = np.matmul(g_obj_to_world, T_object_gripper.matrix)
+
+    # open gripper
+    right_gripper.open()
+
+    # first pose
+    # multiply z direction unit vector by T_object_gripper rotation, multiply by how far we want
+    # to start from the intended grip, and add it to the translation of T_object_gripper to get destination
+    pullback_dist = 0.3
+    first_position = np.matmul(T_object_gripper.rotation, np.array([0, 0, 1])) * 0.3 + T_object_gripper.translation
+
+    # multiply destination by overall transform to get destination point
+    first_dest = np.matmul(g_final, first_position)
+
+    # go to that point with orientation
+    goal1 = PoseStamped()
+    goal1.header.frame_id = "base"
+    goal1.pose.position = first_dest[0:3]
+    goal1.pose.orientation = orient
+    go_to_pose(goal1.pose)
+
+    # second pose
+
+    # preserve orientation (assumes vertical/top-down orientation, as before)
+    orien_const = OrientationConstraint()
+    orien_const.link_name = "right_gripper";
+    orien_const.header.frame_id = "base";
+    orien_const.orientation.y = -1.0;
+    orien_const.absolute_x_axis_tolerance = 0.1;
+    orien_const.absolute_y_axis_tolerance = 0.1;
+    orien_const.absolute_z_axis_tolerance = 0.1;
+    orien_const.weight = 1.0;
+    consts = Constraints()
+    consts.orientation_constraints = [orien_const]
+    right_arm.set_path_constraints(consts)
+
+    # multiply [0, 0, 0, 1] by overall transform to get destination point
+    second_dest = np.matmul(g_final, np.array([0, 0, 0, 1]))
+
+    # go to that point with orientation constraint
+    goal2 = PoseStamped()
+    goal2.header.frame_id = "base"
+    goal2.pose.position = second_dest[0:3]
+    goal2.pose.orientation = orient
+    go_to_pose(goal2.pose)
+
+    # close gripper
+    right_gripper.close()
+
+    # go to first pose again
+    go_to_pose(goal1.pose)
+
 
 def contacts_to_baxter_hand_pose(contact1, contact2, approach_direction):
     """ takes the contacts positions in the object frame and returns the hand pose T_obj_gripper
@@ -131,8 +193,19 @@ def contacts_to_baxter_hand_pose(contact1, contact2, approach_direction):
     -------
     :obj:`autolab_core:RigidTransform` Hand pose in the object frame
     """
-    # YOUR CODE HERE
-    T_obj_gripper = None
+    # translation = average of contact points
+    translation = (contact1 + contact2) / 2
+
+    # x axis = vector pointing between contact points
+    x_axis = contact1 - contact2
+
+    # approach direction = z axis = always vertical... some grasps will fail, that's just how it is
+    # Chris recommended hardcoding the approach direction like this
+    z_axis = approach_direction
+
+    # find g transform from object frame to grasp frame...
+    transform = utils.look_at_general(translation, x_axis, z_axis)
+    T_obj_gripper = autolab_core.RigidTransform(transform[0:3,0:3], translation)
     return T_obj_gripper
 
 def sorted_contacts(vertices, normals, T_ar_object):
@@ -165,7 +238,7 @@ def sorted_contacts(vertices, normals, T_ar_object):
     # vertices are too big for the gripper
 
     # possible metrics: compute_force_closure, compute_gravity_resistance, compute_custom_metric
-    metric = compute_custom_metric
+    metric = compute_force_closure
     grasp_indices = list()
     metric_scores = list()
     for i in range(N):
@@ -187,11 +260,11 @@ def sorted_contacts(vertices, normals, T_ar_object):
 
 
 # probably don't need to change these (but confirm that they're correct)
-MAX_HAND_DISTANCE = .055
-MIN_HAND_DISTANCE = .01
+MAX_HAND_DISTANCE = 0.1 # .055
+MIN_HAND_DISTANCE = 0.01
 CONTACT_MU = 0.5 # coefficient of friction
-CONTACT_GAMMA = 0.1 # coefficient of tortion friction
-
+CONTACT_GAMMA = 0.1 # coefficient of torsion friction
+orientation
 # will need to change these
 OBJECT_MASS = 0.25 # kg
 # approximate the friction cone as the linear combination of `NUM_FACETS` vectors
@@ -234,8 +307,7 @@ if __name__ == '__main__':
         right_arm.set_planner_id('RRTConnectkConfigDefault')
         right_arm.set_planning_time(5)
         right_gripper = baxter_gripper.Gripper('right')
-        # right_gripper.calibrate()
-        # right_gripper.open()
+        right_gripper.calibrate()
 
         listener = tf.TransformListener()
         from_frame = 'base'
@@ -278,7 +350,9 @@ if __name__ == '__main__':
         if False:
             repeat = True
             while repeat:
-                execute_grasp(T_obj_gripper)
+                # come in from the top...
+                T_obj_gripper = contacts_to_baxter_hand_pose(contact1, contact2, np.array([0, 0, -1]))
+                execute_grasp(T_obj_gripper, T_ar_object, ar_tag)
                 repeat = bool(raw_input("repeat?"))
 
     # 500, 1200
