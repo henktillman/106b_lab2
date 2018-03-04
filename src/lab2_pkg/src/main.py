@@ -29,6 +29,7 @@ from utils import vec, adj
 import scipy
 import copy
 import sys
+import trimesh
 # import cvxpy as cvx
 import Queue
 from grasp_metrics import compute_force_closure, compute_gravity_resistance, compute_custom_metric
@@ -121,6 +122,8 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     # three poses, all use orientation from T_object_gripper (orientations should be preserved
     # between world and obj frame)
     orient = T_object_gripper.quaternion
+    orient = np.array([orient[0], orient[1], 0, 0])
+    orient = utils.normalize(orient)
 
     # multiply g_obj_to_world by new T_object_gripper to get overall transform
     g_final = np.matmul(g_obj_to_world, T_object_gripper.matrix)
@@ -131,13 +134,14 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     # first pose
     # multiply z direction unit vector by T_object_gripper rotation, multiply by how far we want
     # to start from the intended grip, and add it to the translation of T_object_gripper to get destination
-    pullback_dist = 0.05
-    first_position = list(np.array([0, 0, 1]) * pullback_dist + T_object_gripper.translation)
-    first_position.append(1)
-    first_position = np.array(first_position)
+    # pullback_dist = 0.05
+    # first_position = list(np.array([0, 0, 0]) * pullback_dist) #+ T_object_gripper.translation)
+    # first_position.append(1)
+    # first_position = np.array(first_position)
 
     # multiply destination by overall transform to get destination point
-    first_dest = np.matmul(g_final, first_position)
+    # first_dest = np.matmul(g_final, first_position)
+    first_dest = np.matmul(g_final, np.array([0,0,0,1]))
     # pdb.set_trace()
     print(first_dest)
 
@@ -146,13 +150,18 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     goal1.header.frame_id = "base"
     goal1.pose.position.x = first_dest[0]
     goal1.pose.position.y = first_dest[1]
-    goal1.pose.position.z = first_dest[2]
+    goal1.pose.position.z = first_dest[2] + 0.1
     goal1.pose.orientation.x = orient[0]
     goal1.pose.orientation.y = orient[1]
     goal1.pose.orientation.z = orient[2]
     goal1.pose.orientation.w = orient[3]
+    # goal1.pose.orientation.x = 0.0
+    # goal1.pose.orientation.y = -1.0
+    # goal1.pose.orientation.z = 0.0
+    # goal1.pose.orientation.w = 0.0
 
     go_to_pose(goal1.pose)
+
 
     # second pose
 
@@ -182,12 +191,25 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     goal2.pose.orientation.y = orient[1]
     goal2.pose.orientation.z = orient[2]
     goal2.pose.orientation.w = orient[3]
+    # goal2.pose.orientation.x = 1
+    # goal2.pose.orientation.y = 0
+    # goal2.pose.orientation.z = 0.0
+    # goal2.pose.orientation.w = 0.0
     go_to_pose(goal2.pose)
 
     # close gripper
     right_gripper.close()
+    time.sleep(1)
 
     # go to first pose again
+    go_to_pose(goal1.pose)
+
+    goal2.pose.position.y += 0.2
+    go_to_pose(goal2.pose)
+    time.sleep(1)
+    right_gripper.open()
+    time.sleep(1)
+
     go_to_pose(goal1.pose)
 
 
@@ -220,7 +242,8 @@ def contacts_to_baxter_hand_pose(contact1, contact2, approach_direction):
 
     # find g transform from object frame to grasp frame...
     transform = utils.look_at_general(translation, x_axis, z_axis)
-    T_obj_gripper = RigidTransform(transform[0:3,0:3], translation)
+    print(transform)
+    T_obj_gripper = RigidTransform(transform[0:3,0:3], transform[0:3,3])
     return T_obj_gripper
 
 def sorted_contacts(vertices, normals, T_ar_object):
@@ -243,7 +266,7 @@ def sorted_contacts(vertices, normals, T_ar_object):
     :obj:`list` of int
         best_metric_indices is the indices of grasp_indices in order of grasp quality
     """
-    N = 10000
+    N = 1000
     # prune vertices that are too close to the table so you dont smack into the table
     # you may want to change this line, to be how you see fit
     possible_indices = np.r_[:len(vertices)][vertices[:,2] + T_ar_object[2,3] >= 0.03]
@@ -253,7 +276,7 @@ def sorted_contacts(vertices, normals, T_ar_object):
     # vertices are too big for the gripper
 
     # possible metrics: compute_force_closure, compute_gravity_resistance, compute_custom_metric
-    metric = compute_force_closure
+    metric = compute_custom_metric
     grasp_indices = list()
     metric_scores = list()
     for i in range(N):
@@ -276,7 +299,7 @@ def sorted_contacts(vertices, normals, T_ar_object):
 
 # probably don't need to change these (but confirm that they're correct)
 MAX_HAND_DISTANCE = 0.1 # .055
-MIN_HAND_DISTANCE = 0.01
+MIN_HAND_DISTANCE = 0.02
 CONTACT_MU = 0.5 # coefficient of friction
 CONTACT_GAMMA = 0.1 # coefficient of torsion friction
 
@@ -288,7 +311,7 @@ NUM_FACETS = 32
 BAXTER_CONNECTED = True
 # how many to execute
 NUM_GRASPS = 5
-OBJECT = "pawn"
+OBJECT = "gearbox"
 
 # objects are different this year so you'll have to change this
 # also you can use nodes/object_pose_publisher.py instead of finding the ar tag and then computing T_ar_object in this script.
@@ -298,18 +321,18 @@ if OBJECT == "pawn":
     TAG = 14
     # transform between the object and the AR tag on the paper
     # z direction sketch af but Adarsh gave us these offsets
-    T_ar_object = tfs.translation_matrix([-.05, 0.085, 0.091])
+    T_ar_object = tfs.translation_matrix([0.03, 0.085, 0.091]) #[-0.064, -0.099, 0.091]) #
     # how many times to subdivide the mesh
     SUBDIVIDE_STEPS = 0
 elif OBJECT == 'nozzle':
     MESH_FILENAME = '/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/objects/nozzle.obj'
-    TAG = 9
-    T_ar_object = tfs.translation_matrix([-.09, -.065, 0.035])
+    TAG = 14
+    T_ar_object = tfs.translation_matrix([-.09, .065, 0.035])
     SUBDIVIDE_STEPS = 1
 elif OBJECT == "gearbox":
     MESH_FILENAME = '/home/cc/ee106b/sp18/class/ee106b-aax/ros_workspaces/lab2_ws/src/lab2_pkg/objects/gearbox.obj'
-    TAG = 10
-    T_ar_object = tfs.translation_matrix([-.09, -.065, 0.038])
+    TAG = 14
+    T_ar_object = tfs.translation_matrix([-.09, .065, 0.058])
     SUBDIVIDE_STEPS = 0
     
 if __name__ == '__main__':
@@ -319,8 +342,9 @@ if __name__ == '__main__':
         robot = moveit_commander.RobotCommander()
         scene = moveit_commander.PlanningSceneInterface()
         right_arm = moveit_commander.MoveGroupCommander('right_arm')
-        right_arm.set_planner_id('RRTConnectkConfigDefault')
-        right_arm.set_planning_time(5)
+        # right_arm.set_planner_id('RRTConnectkConfigDefault')
+        right_arm.set_planner_id('SPARSConnectkConfigDefault')
+        right_arm.set_planning_time(15)
         right_gripper = baxter_gripper.Gripper('right')
         right_gripper.calibrate()
 
@@ -331,19 +355,26 @@ if __name__ == '__main__':
     # Main Code
     br = tf.TransformBroadcaster()
 
-    # SETUP
+    # # SETUP
+    # of = ObjFile(MESH_FILENAME)
+    # mesh = of.read()
+
+    # # We found this helped.  You may not.  I believe there was a problem with setting the surface normals.
+    # # I remember fixing that....but I didn't save that code, so you may have to redo it.  
+    # # You may need to fix that if you call this function.
+    # for i in range(SUBDIVIDE_STEPS):
+    #     mesh = mesh.subdivide(min_tri_length=.02)
+
+    # vertices = mesh.vertices # points on the obj
+    # triangles = mesh.triangles # combinations of vertex indices
+    # normals = mesh.normals # unit vectors normal to the object surface at their respective vertex
+    # pdb.set_trace()
+    mesh = trimesh.load(MESH_FILENAME)
+    vertices = mesh.vertices
+    triangles = mesh.triangles
+    normals = mesh.vertex_normals
     of = ObjFile(MESH_FILENAME)
-    mesh = of.read()
-
-    # We found this helped.  You may not.  I believe there was a problem with setting the surface normals.
-    # I remember fixing that....but I didn't save that code, so you may have to redo it.  
-    # You may need to fix that if you call this function.
-    for i in range(SUBDIVIDE_STEPS):
-        mesh = mesh.subdivide(min_tri_length=.02)
-
-    vertices = mesh.vertices # points on the obj
-    triangles = mesh.triangles # combinations of vertex indices
-    normals = mesh.normals # unit vectors normal to the object surface at their respective vertex
+    mesh = of.read()    
     ar_tag = lookup_tag(TAG)
     print("found", TAG)
     # find the transformation from the object coordinates to world coordinates... somehow
