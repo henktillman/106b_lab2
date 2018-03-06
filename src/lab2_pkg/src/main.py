@@ -132,15 +132,8 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     right_gripper.open()
 
     # first pose
-    # multiply z direction unit vector by T_object_gripper rotation, multiply by how far we want
-    # to start from the intended grip, and add it to the translation of T_object_gripper to get destination
-    # pullback_dist = 0.05
-    # first_position = list(np.array([0, 0, 0]) * pullback_dist) #+ T_object_gripper.translation)
-    # first_position.append(1)
-    # first_position = np.array(first_position)
 
     # multiply destination by overall transform to get destination point
-    # first_dest = np.matmul(g_final, first_position)
     first_dest = np.matmul(g_final, np.array([0,0,0,1]))
     # pdb.set_trace()
     print(first_dest)
@@ -155,28 +148,11 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     goal1.pose.orientation.y = orient[1]
     goal1.pose.orientation.z = orient[2]
     goal1.pose.orientation.w = orient[3]
-    # goal1.pose.orientation.x = 0.0
-    # goal1.pose.orientation.y = -1.0
-    # goal1.pose.orientation.z = 0.0
-    # goal1.pose.orientation.w = 0.0
 
     go_to_pose(goal1.pose)
 
 
     # second pose
-
-    # preserve orientation (assumes vertical/top-down orientation, as before)
-    # orien_const = OrientationConstraint()
-    # orien_const.link_name = "right_gripper";
-    # orien_const.header.frame_id = "base";
-    # orien_const.orientation.y = -1.0;
-    # orien_const.absolute_x_axis_tolerance = 0.1;
-    # orien_const.absolute_y_axis_tolerance = 0.1;
-    # orien_const.absolute_z_axis_tolerance = 0.1;
-    # orien_const.weight = 1.0;
-    # consts = Constraints()
-    # consts.orientation_constraints = [orien_const]
-    # right_arm.set_path_constraints(consts)
 
     # multiply [0, 0, 0, 1] by overall transform to get destination point
     second_dest = np.matmul(g_final, np.array([0, 0, 0, 1]))
@@ -191,10 +167,6 @@ def execute_grasp(T_object_gripper, T_ar_object, ar_tag):
     goal2.pose.orientation.y = orient[1]
     goal2.pose.orientation.z = orient[2]
     goal2.pose.orientation.w = orient[3]
-    # goal2.pose.orientation.x = 1
-    # goal2.pose.orientation.y = 0
-    # goal2.pose.orientation.z = 0.0
-    # goal2.pose.orientation.w = 0.0
     go_to_pose(goal2.pose)
 
     # close gripper
@@ -355,20 +327,7 @@ if __name__ == '__main__':
     # Main Code
     br = tf.TransformBroadcaster()
 
-    # # SETUP
-    # of = ObjFile(MESH_FILENAME)
-    # mesh = of.read()
-
-    # # We found this helped.  You may not.  I believe there was a problem with setting the surface normals.
-    # # I remember fixing that....but I didn't save that code, so you may have to redo it.  
-    # # You may need to fix that if you call this function.
-    # for i in range(SUBDIVIDE_STEPS):
-    #     mesh = mesh.subdivide(min_tri_length=.02)
-
-    # vertices = mesh.vertices # points on the obj
-    # triangles = mesh.triangles # combinations of vertex indices
-    # normals = mesh.normals # unit vectors normal to the object surface at their respective vertex
-    # pdb.set_trace()
+    # SETUP
     mesh = trimesh.load(MESH_FILENAME)
     vertices = mesh.vertices
     triangles = mesh.triangles
@@ -376,7 +335,6 @@ if __name__ == '__main__':
     of = ObjFile(MESH_FILENAME)
     mesh = of.read()    
     ar_tag = lookup_tag(TAG)
-    print("found", TAG)
     # find the transformation from the object coordinates to world coordinates... somehow
 
     grasp_indices, best_metric_indices = sorted_contacts(vertices, normals, T_ar_object)
@@ -401,5 +359,4 @@ if __name__ == '__main__':
                 execute_grasp(T_obj_gripper, T_ar_object, ar_tag)
                 repeat = bool(raw_input("repeat?"))
 
-    # 500, 1200
     exit()
